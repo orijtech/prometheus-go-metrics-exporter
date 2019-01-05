@@ -16,6 +16,10 @@ package prometheus
 
 import (
 	"context"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -253,4 +257,159 @@ func TestCollectNonRacy(t *testing.T) {
 			}
 		}
 	}()
+}
+
+func makeMetrics() []*metricspb.Metric {
+	return []*metricspb.Metric{
+		{
+			Descriptor_: &metricspb.Metric_MetricDescriptor{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "with/metric*descriptor",
+					Description: "This is a test",
+					Unit:        "By",
+				},
+			},
+			Timeseries: []*metricspb.TimeSeries{
+				{
+					StartTimestamp: startTimestamp,
+					Points: []*metricspb.Point{
+						{
+							Timestamp: endTimestamp,
+							Value: &metricspb.Point_DistributionValue{
+								DistributionValue: &metricspb.DistributionValue{
+									Count:                 2,
+									Sum:                   61.9,
+									SumOfSquaredDeviation: 0,
+									Buckets: []*metricspb.DistributionValue_Bucket{
+										{}, {Count: 1}, {}, {}, {Count: 5},
+									},
+									BucketOptions: &metricspb.DistributionValue_BucketOptions{
+										Type: &metricspb.DistributionValue_BucketOptions_Explicit_{
+											Explicit: &metricspb.DistributionValue_BucketOptions_Explicit{
+												Bounds: []float64{0, 10, 20, 30, 40},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Descriptor_: &metricspb.Metric_MetricDescriptor{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "this/one/there(where)",
+					Description: "Extra ones",
+					Unit:        "1",
+					LabelKeys: []*metricspb.LabelKey{
+						{Key: "os", Description: "Operating system"},
+						{Key: "arch", Description: "Architecture"},
+					},
+				},
+			},
+			Timeseries: []*metricspb.TimeSeries{
+				{
+					StartTimestamp: startTimestamp,
+					LabelValues: []*metricspb.LabelValue{
+						{Value: "windows"},
+						{Value: "x86"},
+					},
+					Points: []*metricspb.Point{
+						{
+							Timestamp: endTimestamp,
+							Value: &metricspb.Point_Int64Value{
+								Int64Value: 99,
+							},
+						},
+					},
+				},
+				{
+					StartTimestamp: startTimestamp,
+					LabelValues: []*metricspb.LabelValue{
+						{Value: "darwin"},
+						{Value: "386"},
+					},
+					Points: []*metricspb.Point{
+						{
+							Timestamp: endTimestamp,
+							Value: &metricspb.Point_DoubleValue{
+								DoubleValue: 49.5,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestMetricsEndpointOutput(t *testing.T) {
+	exp, err := New(Options{})
+	if err != nil {
+		t.Fatalf("Failed to create Prometheus exporter: %v", err)
+	}
+
+	srv := httptest.NewServer(exp)
+	defer srv.Close()
+
+	// Now record some metrics.
+	metrics := makeMetrics()
+	for _, metric := range metrics {
+		exp.ExportMetric(context.Background(), nil, nil, metric)
+	}
+
+	var i int
+	var output string
+	for {
+		time.Sleep(10 * time.Millisecond)
+		if i == 1000 {
+			t.Fatal("no output at / (10s wait)")
+		}
+		i++
+
+		resp, err := http.Get(srv.URL)
+		if err != nil {
+			t.Fatalf("Failed to get metrics on / error: %v", err)
+		}
+
+		slurp, err := ioutil.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			t.Fatalf("Failed to read body: %v", err)
+		}
+
+		output = string(slurp)
+		if output != "" {
+			break
+		}
+	}
+
+	if strings.Contains(output, "collected before with the same name and label values") {
+		t.Fatalf("metric name and labels were duplicated but must be unique. Got\n\t%q", output)
+	}
+
+	if strings.Contains(output, "error(s) occurred") {
+		t.Fatalf("error reported by Prometheus registry:\n\t%s", output)
+	}
+
+	want := `# HELP this_one_there_where_ Extra ones
+# TYPE this_one_there_where_ counter
+this_one_there_where_{arch="386",os="darwin"} 49.5
+this_one_there_where_{arch="x86",os="windows"} 99
+# HELP with_metric_descriptor This is a test
+# TYPE with_metric_descriptor histogram
+with_metric_descriptor_bucket{le="0"} 0
+with_metric_descriptor_bucket{le="10"} 1
+with_metric_descriptor_bucket{le="20"} 1
+with_metric_descriptor_bucket{le="30"} 1
+with_metric_descriptor_bucket{le="40"} 6
+with_metric_descriptor_bucket{le="+Inf"} 2
+with_metric_descriptor_sum 61.9
+with_metric_descriptor_count 2
+`
+	if g, w := output, want; g != w {
+		t.Errorf("Mismatched output\nGot:\n%s\nWant:\n%s", g, w)
+	}
 }

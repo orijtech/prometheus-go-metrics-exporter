@@ -229,7 +229,12 @@ func (c *collector) protoTimeSeriesToPrometheusMetrics(ctx context.Context, metr
 	if ts == nil {
 		return nil, errNilTimeSeries
 	}
-	labelValues := protoLabelValuesToLabelValues(ts.LabelValues)
+
+	labelKeys := metric.GetMetricDescriptor().GetLabelKeys()
+	labelValues, err := protoLabelValuesToLabelValues(labelKeys, ts.LabelValues)
+	if err != nil {
+		return nil, err
+	}
 	derivedPrometheusValueType := prometheusValueType(metric)
 	desc, _, _ := c.lookupPrometheusDesc(c.opts.Namespace, metric)
 
@@ -245,18 +250,22 @@ func (c *collector) protoTimeSeriesToPrometheusMetrics(ctx context.Context, metr
 	return pmetrics, nil
 }
 
-func protoLabelValuesToLabelValues(protoLabelValues []*metricspb.LabelValue) []string {
+func protoLabelValuesToLabelValues(rubricLabelKeys []*metricspb.LabelKey, protoLabelValues []*metricspb.LabelValue) ([]string, error) {
 	if len(protoLabelValues) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	plainLabelValues := make([]string, len(protoLabelValues))
-	for i, protoLabelValue := range protoLabelValues {
-		if protoLabelValue.HasValue {
+	if len(protoLabelValues) > len(rubricLabelKeys) {
+		return nil, fmt.Errorf("len(LabelValues)=%d > len(labelKeys)=%d", len(protoLabelValues), len(rubricLabelKeys))
+	}
+	plainLabelValues := make([]string, len(rubricLabelKeys))
+	for i := 0; i < len(rubricLabelKeys); i++ {
+		protoLabelValue := protoLabelValues[i]
+		if protoLabelValue.Value != "" || protoLabelValue.HasValue {
 			plainLabelValues[i] = protoLabelValue.Value
 		}
 	}
-	return plainLabelValues
+	return plainLabelValues, nil
 }
 
 func protoLabelKeysToLabels(protoLabelKeys []*metricspb.LabelKey) []string {
