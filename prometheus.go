@@ -24,13 +24,17 @@ import (
 	"sort"
 	"sync"
 
-	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	"go.opencensus.io/trace"
+
+	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
+	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
+	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// Exporter is the type that converts OpenCensus Proto-Metrics into Prometheus metrics.
 type Exporter struct {
 	options   Options
 	handler   http.Handler
@@ -38,6 +42,7 @@ type Exporter struct {
 	gatherer  prometheus.Gatherer
 }
 
+// Options customizes a created Prometheus Exporter.
 type Options struct {
 	Namespace   string
 	OnError     func(err error)
@@ -45,6 +50,7 @@ type Options struct {
 	Registry    *prometheus.Registry
 }
 
+// New is the constructor to make an Exporter with the defined Options.
 func New(o Options) (*Exporter, error) {
 	if o.Registry == nil {
 		o.Registry = prometheus.NewRegistry()
@@ -74,6 +80,7 @@ func newCollector(opts Options, registry *prometheus.Registry) *collector {
 		registry:          registry,
 		opts:              opts,
 		registeredMetrics: make(map[string]*prometheus.Desc),
+		metricsData:       make(map[string]*metricspb.Metric),
 	}
 }
 
@@ -88,7 +95,7 @@ func (c *collector) lookupPrometheusDesc(namespace string, metric *metricspb.Met
 	return desc, signature, ok
 }
 
-func (c *collector) registerMetrics(metrics ...*metricspb.Metric) {
+func (c *collector) registerMetrics(metrics ...*metricspb.Metric) error {
 	count := 0
 	for _, metric := range metrics {
 		_, signature, ok := c.lookupPrometheusDesc(c.opts.Namespace, metric)
@@ -108,10 +115,10 @@ func (c *collector) registerMetrics(metrics ...*metricspb.Metric) {
 	}
 
 	if count == 0 {
-		return
+		return nil
 	}
 
-	c.ensureRegisteredOnce()
+	return c.ensureRegisteredOnce()
 }
 
 func metricName(namespace string, metric *metricspb.Metric) string {
@@ -136,12 +143,14 @@ func metricSignature(namespace string, metric *metricspb.Metric) string {
 	return buf.String()
 }
 
-func (c *collector) ensureRegisteredOnce() {
+func (c *collector) ensureRegisteredOnce() error {
+	var finalErr error
 	c.registerOnce.Do(func() {
 		if err := c.registry.Register(c); err != nil {
-			c.opts.OnError(fmt.Errorf("ensureRegisteredOnce: cannot register the collector: %v", err))
+			finalErr = err
 		}
 	})
+	return finalErr
 }
 
 func (exp *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -149,11 +158,35 @@ func (exp *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *Options) onError(err error) {
-	if o.OnError != nil {
+	if o != nil && o.OnError != nil {
 		o.OnError(err)
 	} else {
 		log.Printf("Failed to export to Prometheus: %v", err)
 	}
+}
+
+// ExportMetric is the method that the exporter uses to convert OpenCensus Proto-Metrics to Prometheus metrics.
+func (exp *Exporter) ExportMetric(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metric *metricspb.Metric) error {
+	if metric == nil || len(metric.Timeseries) == 0 {
+		return nil
+	}
+
+	// TODO: (@odeke-em) use node, resource and metrics e.g. perhaps to derive default labels
+	return exp.collector.addMetric(metric)
+}
+
+func (c *collector) addMetric(metric *metricspb.Metric) error {
+	if err := c.registerMetrics(metric); err != nil {
+		return err
+	}
+
+	signature := metricSignature(c.opts.Namespace, metric)
+
+	c.mu.Lock()
+	c.metricsData[signature] = metric
+	c.mu.Unlock()
+
+	return nil
 }
 
 func (c *collector) Describe(ch chan<- *prometheus.Desc) {
