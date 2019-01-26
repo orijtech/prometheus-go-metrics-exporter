@@ -260,6 +260,9 @@ func protoLabelValuesToLabelValues(rubricLabelKeys []*metricspb.LabelKey, protoL
 	}
 	plainLabelValues := make([]string, len(rubricLabelKeys))
 	for i := 0; i < len(rubricLabelKeys); i++ {
+		if i >= len(protoLabelValues) {
+			continue
+		}
 		protoLabelValue := protoLabelValues[i]
 		if protoLabelValue.Value != "" || protoLabelValue.HasValue {
 			plainLabelValues[i] = protoLabelValue.Value
@@ -271,7 +274,8 @@ func protoLabelValuesToLabelValues(rubricLabelKeys []*metricspb.LabelKey, protoL
 func protoLabelKeysToLabels(protoLabelKeys []*metricspb.LabelKey) []string {
 	labelKeys := make([]string, 0, len(protoLabelKeys))
 	for _, protoLabelKey := range protoLabelKeys {
-		labelKeys = append(labelKeys, protoLabelKey.GetKey())
+		sanitizedKey := sanitize(protoLabelKey.GetKey())
+		labelKeys = append(labelKeys, sanitizedKey)
 	}
 	return labelKeys
 }

@@ -306,6 +306,7 @@ func makeMetrics() []*metricspb.Metric {
 					LabelKeys: []*metricspb.LabelKey{
 						{Key: "os", Description: "Operating system"},
 						{Key: "arch", Description: "Architecture"},
+						{Key: "my.org/department", Description: "The department that owns this server"},
 					},
 				},
 			},
@@ -315,6 +316,7 @@ func makeMetrics() []*metricspb.Metric {
 					LabelValues: []*metricspb.LabelValue{
 						{Value: "windows"},
 						{Value: "x86"},
+						{Value: "Storage"},
 					},
 					Points: []*metricspb.Point{
 						{
@@ -330,6 +332,7 @@ func makeMetrics() []*metricspb.Metric {
 					LabelValues: []*metricspb.LabelValue{
 						{Value: "darwin"},
 						{Value: "386"},
+						{Value: "Ops"},
 					},
 					Points: []*metricspb.Point{
 						{
@@ -396,8 +399,8 @@ func TestMetricsEndpointOutput(t *testing.T) {
 
 	want := `# HELP this_one_there_where_ Extra ones
 # TYPE this_one_there_where_ counter
-this_one_there_where_{arch="386",os="darwin"} 49.5
-this_one_there_where_{arch="x86",os="windows"} 99
+this_one_there_where_{arch="386",my_org_department="Ops",os="darwin"} 49.5
+this_one_there_where_{arch="x86",my_org_department="Storage",os="windows"} 99
 # HELP with_metric_descriptor This is a test
 # TYPE with_metric_descriptor histogram
 with_metric_descriptor_bucket{le="0"} 0
