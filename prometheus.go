@@ -127,9 +127,6 @@ func metricName(namespace string, metric *metricspb.Metric) string {
 		name = namespace + "_"
 	}
 	mName := metric.GetMetricDescriptor().GetName()
-	if mName == "" {
-		mName = metric.GetName()
-	}
 	return name + sanitize(mName)
 }
 

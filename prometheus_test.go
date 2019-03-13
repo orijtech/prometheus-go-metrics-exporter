@@ -52,12 +52,10 @@ func TestOnlyCumulativeWindowSupported(t *testing.T) {
 		},
 		{
 			metric: &metricspb.Metric{
-				Descriptor_: &metricspb.Metric_MetricDescriptor{
-					MetricDescriptor: &metricspb.MetricDescriptor{
-						Name:        "with_metric_descriptor",
-						Description: "This is a test",
-						Unit:        "By",
-					},
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "with_metric_descriptor",
+					Description: "This is a test",
+					Unit:        "By",
 				},
 				Timeseries: []*metricspb.TimeSeries{
 					{
@@ -91,12 +89,10 @@ func TestOnlyCumulativeWindowSupported(t *testing.T) {
 		},
 		{
 			metric: &metricspb.Metric{
-				Descriptor_: &metricspb.Metric_MetricDescriptor{
-					MetricDescriptor: &metricspb.MetricDescriptor{
-						Name:        "counter",
-						Description: "This is a counter",
-						Unit:        "1",
-					},
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "counter",
+					Description: "This is a counter",
+					Unit:        "1",
 				},
 				Timeseries: []*metricspb.TimeSeries{
 					{
@@ -156,12 +152,10 @@ func TestCollectNonRacy(t *testing.T) {
 		for i := 0; i < 1e3; i++ {
 			metrics := []*metricspb.Metric{
 				{
-					Descriptor_: &metricspb.Metric_MetricDescriptor{
-						MetricDescriptor: &metricspb.MetricDescriptor{
-							Name:        "with_metric_descriptor",
-							Description: "This is a test",
-							Unit:        "By",
-						},
+					MetricDescriptor: &metricspb.MetricDescriptor{
+						Name:        "with_metric_descriptor",
+						Description: "This is a test",
+						Unit:        "By",
 					},
 					Timeseries: []*metricspb.TimeSeries{
 						{
@@ -262,12 +256,10 @@ func TestCollectNonRacy(t *testing.T) {
 func makeMetrics() []*metricspb.Metric {
 	return []*metricspb.Metric{
 		{
-			Descriptor_: &metricspb.Metric_MetricDescriptor{
-				MetricDescriptor: &metricspb.MetricDescriptor{
-					Name:        "with/metric*descriptor",
-					Description: "This is a test",
-					Unit:        "By",
-				},
+			MetricDescriptor: &metricspb.MetricDescriptor{
+				Name:        "with/metric*descriptor",
+				Description: "This is a test",
+				Unit:        "By",
 			},
 			Timeseries: []*metricspb.TimeSeries{
 				{
