@@ -62,15 +62,13 @@ var (
 )
 
 var metric1 = &metricspb.Metric{
-	Descriptor_: &metricspb.Metric_MetricDescriptor{
-		MetricDescriptor: &metricspb.MetricDescriptor{
-			Name:        "this/one/there(where)",
-			Description: "Extra ones",
-			Unit:        "1",
-			LabelKeys: []*metricspb.LabelKey{
-				{Key: "os", Description: "Operating system"},
-				{Key: "arch", Description: "Architecture"},
-			},
+	MetricDescriptor: &metricspb.MetricDescriptor{
+		Name:        "this/one/there(where)",
+		Description: "Extra ones",
+		Unit:        "1",
+		LabelKeys: []*metricspb.LabelKey{
+			{Key: "os", Description: "Operating system"},
+			{Key: "arch", Description: "Architecture"},
 		},
 	},
 	Timeseries: []*metricspb.TimeSeries{

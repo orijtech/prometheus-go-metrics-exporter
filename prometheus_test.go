@@ -186,12 +186,10 @@ func TestCollectNonRacy(t *testing.T) {
 					},
 				},
 				{
-					Descriptor_: &metricspb.Metric_MetricDescriptor{
-						MetricDescriptor: &metricspb.MetricDescriptor{
-							Name:        "counter",
-							Description: "This is a counter",
-							Unit:        "1",
-						},
+					MetricDescriptor: &metricspb.MetricDescriptor{
+						Name:        "counter",
+						Description: "This is a counter",
+						Unit:        "1",
 					},
 					Timeseries: []*metricspb.TimeSeries{
 						{
@@ -290,16 +288,14 @@ func makeMetrics() []*metricspb.Metric {
 			},
 		},
 		{
-			Descriptor_: &metricspb.Metric_MetricDescriptor{
-				MetricDescriptor: &metricspb.MetricDescriptor{
-					Name:        "this/one/there(where)",
-					Description: "Extra ones",
-					Unit:        "1",
-					LabelKeys: []*metricspb.LabelKey{
-						{Key: "os", Description: "Operating system"},
-						{Key: "arch", Description: "Architecture"},
-						{Key: "my.org/department", Description: "The department that owns this server"},
-					},
+			MetricDescriptor: &metricspb.MetricDescriptor{
+				Name:        "this/one/there(where)",
+				Description: "Extra ones",
+				Unit:        "1",
+				LabelKeys: []*metricspb.LabelKey{
+					{Key: "os", Description: "Operating system"},
+					{Key: "arch", Description: "Architecture"},
+					{Key: "my.org/department", Description: "The department that owns this server"},
 				},
 			},
 			Timeseries: []*metricspb.TimeSeries{
@@ -331,6 +327,38 @@ func makeMetrics() []*metricspb.Metric {
 							Timestamp: endTimestamp,
 							Value: &metricspb.Point_DoubleValue{
 								DoubleValue: 49.5,
+							},
+						},
+					},
+				},
+			},
+		},
+		// Unlimited key length.
+		{
+			MetricDescriptor: &metricspb.MetricDescriptor{
+				Name:        strings.Repeat("a_", 60),
+				Description: "Unlimited metric key lengths",
+				Unit:        "1",
+				LabelKeys: []*metricspb.LabelKey{
+					{Key: "os", Description: "Operating system"},
+					{Key: "arch", Description: "Architecture"},
+					{Key: "my.org/department", Description: "The department that owns this server"},
+					{Key: strings.Repeat("key", 50), Description: "The department that owns this server"},
+				},
+			},
+			Timeseries: []*metricspb.TimeSeries{
+				{
+					StartTimestamp: startTimestamp,
+					LabelValues: []*metricspb.LabelValue{
+						{Value: "windows"},
+						{Value: "x86"},
+						{Value: "Storage"},
+					},
+					Points: []*metricspb.Point{
+						{
+							Timestamp: endTimestamp,
+							Value: &metricspb.Point_Int64Value{
+								Int64Value: 99,
 							},
 						},
 					},
@@ -389,7 +417,10 @@ func TestMetricsEndpointOutput(t *testing.T) {
 		t.Fatalf("error reported by Prometheus registry:\n\t%s", output)
 	}
 
-	want := `# HELP this_one_there_where_ Extra ones
+	want := `# HELP a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_ Unlimited metric key lengths
+# TYPE a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_ counter
+a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_{arch="x86",keykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykey="",my_org_department="Storage",os="windows"} 99
+# HELP this_one_there_where_ Extra ones
 # TYPE this_one_there_where_ counter
 this_one_there_where_{arch="386",my_org_department="Ops",os="darwin"} 49.5
 this_one_there_where_{arch="x86",my_org_department="Storage",os="windows"} 99

@@ -14,7 +14,7 @@
 
 package prometheus
 
-// The code for sanitize is copied verbatim from:
+// The code for sanitize is mostly copied from:
 //  https://github.com/census-instrumentation/opencensus-go/blob/950a67f393d867cfbe91414063b69e511f42fefb/internal/sanitize.go#L1-L50
 
 import (
@@ -22,17 +22,16 @@ import (
 	"unicode"
 )
 
-const labelKeySizeLimit = 100
-
-// sanitize returns a string that is trunacated to 100 characters if it's too
-// long, and replaces non-alphanumeric characters to underscores.
+// sanitize replaces non-alphanumeric characters with underscores in s.
 func sanitize(s string) string {
 	if len(s) == 0 {
 		return s
 	}
-	if len(s) > labelKeySizeLimit {
-		s = s[:labelKeySizeLimit]
-	}
+
+        // Note: No length limit for label keys because Prometheus doesn't
+        // define a length limit, thus we should NOT be truncating label keys.
+        // See https://github.com/orijtech/prometheus-go-metrics-exporter/issues/4.
+	
 	s = strings.Map(sanitizeRune, s)
 	if unicode.IsDigit(rune(s[0])) {
 		s = "key_" + s
