@@ -60,7 +60,7 @@ func New(o Options) (*Exporter, error) {
 		options:   o,
 		gatherer:  o.Registry,
 		collector: collector,
-		handler:   promhttp.HandlerFor(o.Registry, promhttp.HandlerOpts{}),
+		handler:   promhttp.HandlerFor(o.Registry, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
 	}
 	return exp, nil
 }
