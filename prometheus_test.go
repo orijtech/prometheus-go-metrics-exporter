@@ -93,6 +93,7 @@ func TestOnlyCumulativeWindowSupported(t *testing.T) {
 					Name:        "counter",
 					Description: "This is a counter",
 					Unit:        "1",
+					Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
 				},
 				Timeseries: []*metricspb.TimeSeries{
 					{
@@ -190,6 +191,7 @@ func TestCollectNonRacy(t *testing.T) {
 						Name:        "counter",
 						Description: "This is a counter",
 						Unit:        "1",
+						Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
 					},
 					Timeseries: []*metricspb.TimeSeries{
 						{
@@ -292,6 +294,7 @@ func makeMetrics() []*metricspb.Metric {
 				Name:        "this/one/there(where)",
 				Description: "Extra ones",
 				Unit:        "1",
+				Type:        metricspb.MetricDescriptor_GAUGE_INT64,
 				LabelKeys: []*metricspb.LabelKey{
 					{Key: "os", Description: "Operating system"},
 					{Key: "arch", Description: "Architecture"},
@@ -339,6 +342,7 @@ func makeMetrics() []*metricspb.Metric {
 				Name:        strings.Repeat("a_", 60),
 				Description: "Unlimited metric key lengths",
 				Unit:        "1",
+				Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
 				LabelKeys: []*metricspb.LabelKey{
 					{Key: "os", Description: "Operating system"},
 					{Key: "arch", Description: "Architecture"},
@@ -421,7 +425,7 @@ func TestMetricsEndpointOutput(t *testing.T) {
 # TYPE a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_ counter
 a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_{arch="x86",keykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykey="",my_org_department="Storage",os="windows"} 99
 # HELP this_one_there_where_ Extra ones
-# TYPE this_one_there_where_ counter
+# TYPE this_one_there_where_ gauge
 this_one_there_where_{arch="386",my_org_department="Ops",os="darwin"} 49.5
 this_one_there_where_{arch="x86",my_org_department="Storage",os="windows"} 99
 # HELP with_metric_descriptor This is a test
