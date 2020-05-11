@@ -312,10 +312,10 @@ func protoMetricToPrometheusMetric(ctx context.Context, point *metricspb.Point, 
 
 	case *metricspb.Point_Int64Value:
 		// Derive the Prometheus
-		return prometheus.NewConstMetric(desc, prometheus.CounterValue, float64(value.Int64Value), labelValues...)
+		return prometheus.NewConstMetric(desc, derivedPrometheusType, float64(value.Int64Value), labelValues...)
 
 	case *metricspb.Point_DoubleValue:
-		return prometheus.NewConstMetric(desc, prometheus.CounterValue, value.DoubleValue, labelValues...)
+		return prometheus.NewConstMetric(desc, derivedPrometheusType, value.DoubleValue, labelValues...)
 
 	default:
 		return nil, fmt.Errorf("Unhandled type: %T", point.Value)
