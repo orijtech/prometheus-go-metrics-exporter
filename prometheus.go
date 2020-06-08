@@ -46,6 +46,7 @@ type Exporter struct {
 type Options struct {
 	Namespace   string
 	OnError     func(err error)
+	ErrorLogger promhttp.Logger
 	ConstLabels prometheus.Labels // ConstLabels will be set as labels on all views.
 	Registry    *prometheus.Registry
 }
@@ -60,7 +61,10 @@ func New(o Options) (*Exporter, error) {
 		options:   o,
 		gatherer:  o.Registry,
 		collector: collector,
-		handler:   promhttp.HandlerFor(o.Registry, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
+		handler: promhttp.HandlerFor(o.Registry, promhttp.HandlerOpts{
+			ErrorHandling: promhttp.ContinueOnError,
+			ErrorLog:      o.ErrorLogger,
+		}),
 	}
 	return exp, nil
 }

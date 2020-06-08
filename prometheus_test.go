@@ -415,7 +415,9 @@ func TestMetricsEndpointOutput(t *testing.T) {
 	// Now record some metrics.
 	metrics := makeMetrics()
 	for _, metric := range metrics {
-		exp.ExportMetric(context.Background(), nil, nil, metric)
+		if err := exp.ExportMetric(context.Background(), nil, nil, metric); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	var i int
