@@ -99,7 +99,6 @@ func (c *collector) registerMetrics(metrics ...*metricspb.Metric) error {
 	count := 0
 	for _, metric := range metrics {
 		_, signature, ok := c.lookupPrometheusDesc(c.opts.Namespace, metric)
-
 		if !ok {
 			desc := prometheus.NewDesc(
 				metricName(c.opts.Namespace, metric),
@@ -180,10 +179,21 @@ func (c *collector) addMetric(metric *metricspb.Metric) error {
 	signature := metricSignature(c.opts.Namespace, metric)
 
 	c.mu.Lock()
-	c.metricsData[signature] = metric
+	c.metricsData[signature] = merge(c.metricsData[signature], metric)
 	c.mu.Unlock()
 
 	return nil
+}
+
+// Merge takes two metrics and appends the timeseries of the second to the first
+// Note: this should only be used when metrics have matching signatures
+// If the first metric is nil then it returns the second.
+func merge(a, b *metricspb.Metric) *metricspb.Metric {
+	if a == nil {
+		return b
+	}
+	a.Timeseries = append(a.Timeseries, b.Timeseries...)
+	return a
 }
 
 func (c *collector) Describe(ch chan<- *prometheus.Desc) {

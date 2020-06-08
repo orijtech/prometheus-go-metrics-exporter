@@ -336,6 +336,37 @@ func makeMetrics() []*metricspb.Metric {
 				},
 			},
 		},
+		// Same metric signature, different label values
+		{
+			MetricDescriptor: &metricspb.MetricDescriptor{
+				Name:        "this/one/there(where)",
+				Description: "Extra ones",
+				Unit:        "1",
+				LabelKeys: []*metricspb.LabelKey{
+					{Key: "os", Description: "Operating system"},
+					{Key: "arch", Description: "Architecture"},
+					{Key: "my.org/department", Description: "The department that owns this server"},
+				},
+			},
+			Timeseries: []*metricspb.TimeSeries{
+				{
+					StartTimestamp: startTimestamp,
+					LabelValues: []*metricspb.LabelValue{
+						{Value: "linux"},
+						{Value: "x86"},
+						{Value: "Platform"},
+					},
+					Points: []*metricspb.Point{
+						{
+							Timestamp: endTimestamp,
+							Value: &metricspb.Point_DoubleValue{
+								DoubleValue: 12.3,
+							},
+						},
+					},
+				},
+			},
+		},
 		// Unlimited key length.
 		{
 			MetricDescriptor: &metricspb.MetricDescriptor{
@@ -427,6 +458,7 @@ a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_
 # HELP this_one_there_where_ Extra ones
 # TYPE this_one_there_where_ gauge
 this_one_there_where_{arch="386",my_org_department="Ops",os="darwin"} 49.5
+this_one_there_where_{arch="x86",my_org_department="Platform",os="linux"} 12.3
 this_one_there_where_{arch="x86",my_org_department="Storage",os="windows"} 99
 # HELP with_metric_descriptor This is a test
 # TYPE with_metric_descriptor histogram
