@@ -23,9 +23,11 @@ import (
 	"net/http"
 	"sort"
 	"sync"
+	"time"
 
 	"go.opencensus.io/trace"
 
+	"github.com/golang/protobuf/ptypes"
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
@@ -44,10 +46,11 @@ type Exporter struct {
 
 // Options customizes a created Prometheus Exporter.
 type Options struct {
-	Namespace   string
-	OnError     func(err error)
-	ConstLabels prometheus.Labels // ConstLabels will be set as labels on all views.
-	Registry    *prometheus.Registry
+	Namespace      string
+	OnError        func(err error)
+	ConstLabels    prometheus.Labels // ConstLabels will be set as labels on all views.
+	Registry       *prometheus.Registry
+	SendTimestamps bool
 }
 
 // New is the constructor to make an Exporter with the defined Options.
@@ -237,7 +240,7 @@ func (c *collector) protoTimeSeriesToPrometheusMetrics(ctx context.Context, metr
 
 	pmetrics := make([]prometheus.Metric, 0, len(ts.Points))
 	for _, point := range ts.Points {
-		pmet, err := protoMetricToPrometheusMetric(ctx, point, desc, derivedPrometheusValueType, labelValues)
+		pmet, err := protoMetricToPrometheusMetric(ctx, point, desc, derivedPrometheusValueType, labelValues, c.opts.SendTimestamps)
 		if err == nil {
 			pmetrics = append(pmetrics, pmet)
 		} else {
@@ -277,7 +280,12 @@ func protoLabelKeysToLabels(protoLabelKeys []*metricspb.LabelKey) []string {
 	return labelKeys
 }
 
-func protoMetricToPrometheusMetric(ctx context.Context, point *metricspb.Point, desc *prometheus.Desc, derivedPrometheusType prometheus.ValueType, labelValues []string) (prometheus.Metric, error) {
+func protoMetricToPrometheusMetric(ctx context.Context, point *metricspb.Point, desc *prometheus.Desc, derivedPrometheusType prometheus.ValueType, labelValues []string, sendTimestamps bool) (prometheus.Metric, error) {
+	timestamp, err := ptypes.Timestamp(point.Timestamp)
+	if err != nil {
+		timestamp = time.Now()
+	}
+
 	switch value := point.Value.(type) {
 	case *metricspb.Point_DistributionValue:
 		dValue := value.DistributionValue
@@ -308,14 +316,26 @@ func protoMetricToPrometheusMetric(ctx context.Context, point *metricspb.Point, 
 			cumCount += countPerBucket
 			points[bucket] = cumCount
 		}
-		return prometheus.NewConstHistogram(desc, uint64(dValue.Count), dValue.Sum, points, labelValues...)
+		metric, err := prometheus.NewConstHistogram(desc, uint64(dValue.Count), dValue.Sum, points, labelValues...)
+		if err != nil || !sendTimestamps {
+			return metric, err
+		}
+		return prometheus.NewMetricWithTimestamp(timestamp, metric), nil
 
 	case *metricspb.Point_Int64Value:
 		// Derive the Prometheus
-		return prometheus.NewConstMetric(desc, derivedPrometheusType, float64(value.Int64Value), labelValues...)
+		metric, err := prometheus.NewConstMetric(desc, derivedPrometheusType, float64(value.Int64Value), labelValues...)
+		if err != nil || !sendTimestamps {
+			return metric, err
+		}
+		return prometheus.NewMetricWithTimestamp(timestamp, metric), nil
 
 	case *metricspb.Point_DoubleValue:
-		return prometheus.NewConstMetric(desc, derivedPrometheusType, value.DoubleValue, labelValues...)
+		metric, err := prometheus.NewConstMetric(desc, derivedPrometheusType, value.DoubleValue, labelValues...)
+		if err != nil || !sendTimestamps {
+			return metric, err
+		}
+		return prometheus.NewMetricWithTimestamp(timestamp, metric), nil
 
 	default:
 		return nil, fmt.Errorf("Unhandled type: %T", point.Value)

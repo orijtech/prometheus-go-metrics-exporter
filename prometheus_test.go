@@ -39,6 +39,15 @@ var (
 		Seconds: 1543160298,
 		Nanos:   100000997,
 	}
+	// before is a scrape that happened 5s earlier
+	startTimestampBefore = &timestamp.Timestamp{
+		Seconds: 1543160293,
+		Nanos:   100000090,
+	}
+	endTimestampBefore = &timestamp.Timestamp{
+		Seconds: 1543160293,
+		Nanos:   100000997,
+	}
 )
 
 func TestOnlyCumulativeWindowSupported(t *testing.T) {
@@ -303,7 +312,7 @@ func makeMetrics() []*metricspb.Metric {
 			},
 			Timeseries: []*metricspb.TimeSeries{
 				{
-					StartTimestamp: startTimestamp,
+					StartTimestamp: startTimestampBefore,
 					LabelValues: []*metricspb.LabelValue{
 						{Value: "windows"},
 						{Value: "x86"},
@@ -311,7 +320,7 @@ func makeMetrics() []*metricspb.Metric {
 					},
 					Points: []*metricspb.Point{
 						{
-							Timestamp: endTimestamp,
+							Timestamp: endTimestampBefore,
 							Value: &metricspb.Point_Int64Value{
 								Int64Value: 99,
 							},
@@ -319,7 +328,7 @@ func makeMetrics() []*metricspb.Metric {
 					},
 				},
 				{
-					StartTimestamp: startTimestamp,
+					StartTimestamp: startTimestampBefore,
 					LabelValues: []*metricspb.LabelValue{
 						{Value: "darwin"},
 						{Value: "386"},
@@ -327,7 +336,7 @@ func makeMetrics() []*metricspb.Metric {
 					},
 					Points: []*metricspb.Point{
 						{
-							Timestamp: endTimestamp,
+							Timestamp: endTimestampBefore,
 							Value: &metricspb.Point_DoubleValue{
 								DoubleValue: 49.5,
 							},
@@ -439,6 +448,81 @@ with_metric_descriptor_bucket{le="+Inf"} 2
 with_metric_descriptor_sum 61.9
 with_metric_descriptor_count 2
 `
+	if g, w := output, want; g != w {
+		t.Errorf("Mismatched output\nGot:\n%s\nWant:\n%s", g, w)
+	}
+}
+
+func TestMetricsEndpointWithTimestampOutput(t *testing.T) {
+	exp, err := New(Options{
+		SendTimestamps: true,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Prometheus exporter: %v", err)
+	}
+
+	srv := httptest.NewServer(exp)
+	defer srv.Close()
+
+	// Now record some metrics.
+	metrics := makeMetrics()
+	for _, metric := range metrics {
+		exp.ExportMetric(context.Background(), nil, nil, metric)
+	}
+
+	var i int
+	var output string
+	for {
+		time.Sleep(10 * time.Millisecond)
+		if i == 1000 {
+			t.Fatal("no output at / (10s wait)")
+		}
+		i++
+
+		resp, err := http.Get(srv.URL)
+		if err != nil {
+			t.Fatalf("Failed to get metrics on / error: %v", err)
+		}
+
+		slurp, err := ioutil.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			t.Fatalf("Failed to read body: %v", err)
+		}
+
+		output = string(slurp)
+		if output != "" {
+			break
+		}
+	}
+
+	if strings.Contains(output, "collected before with the same name and label values") {
+		t.Fatalf("metric name and labels were duplicated but must be unique. Got\n\t%q", output)
+	}
+
+	if strings.Contains(output, "error(s) occurred") {
+		t.Fatalf("error reported by Prometheus registry:\n\t%s", output)
+	}
+
+	want := `# HELP a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_ Unlimited metric key lengths
+# TYPE a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_ counter
+a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_a_{arch="x86",keykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykeykey="",my_org_department="Storage",os="windows"} 99 1543160298100
+# HELP this_one_there_where_ Extra ones
+# TYPE this_one_there_where_ gauge
+this_one_there_where_{arch="386",my_org_department="Ops",os="darwin"} 49.5 1543160293100
+this_one_there_where_{arch="x86",my_org_department="Storage",os="windows"} 99 1543160293100
+# HELP with_metric_descriptor This is a test
+# TYPE with_metric_descriptor histogram
+with_metric_descriptor_bucket{le="0"} 0 1543160298100
+with_metric_descriptor_bucket{le="10"} 1 1543160298100
+with_metric_descriptor_bucket{le="20"} 1 1543160298100
+with_metric_descriptor_bucket{le="30"} 1 1543160298100
+with_metric_descriptor_bucket{le="40"} 6 1543160298100
+with_metric_descriptor_bucket{le="+Inf"} 2 1543160298100
+with_metric_descriptor_sum 61.9 1543160298100
+with_metric_descriptor_count 2 1543160298100
+`
+
 	if g, w := output, want; g != w {
 		t.Errorf("Mismatched output\nGot:\n%s\nWant:\n%s", g, w)
 	}
